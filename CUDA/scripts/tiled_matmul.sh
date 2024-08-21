@@ -3,7 +3,7 @@
 
 # Compile the CUDA code into a shared library
 echo "Compiling CUDA code..."
-nvcc -Xcompiler -fPIC -shared -o lib/lib_tiled_matmul.so src/tiled_matmul.cu
+nvcc -Xcompiler -fPIC -shared -o lib/libtiled_matmul.so src/tiled_matmul.cu
 
 # Check if the compilation was successful
 if [ $? -eq 0 ]; then
@@ -18,7 +18,7 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/lib
 
 # Step 4: Compile and run the C++ unit test
 echo "Compiling and running C++ unit tests..."
-g++ -o tests/test_tiled_matmul tests/test_tiled_matmul.cpp -L./lib -ladd -I./include -lcuda
+g++ -o tests/test_tiled_matmul tests/test_tiled_matmul.cpp -L./lib -ltiled_matmul -I./include -lcuda
 
 if [ $? -eq 0 ]; then
     ./tests/test_add
