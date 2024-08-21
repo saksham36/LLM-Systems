@@ -1,6 +1,6 @@
 # Extend the base image
-FROM rocm/pytorch:rocm6.1_ubuntu22.04_py3.10_pytorch_2.4
-
+# FROM rocm/pytorch:rocm6.1_ubuntu22.04_py3.10_pytorch_2.4
+FROM nvcr.io/nvidia/pytorch:24.07-py3
 # Set the working directory inside the container
 WORKDIR /app
 
