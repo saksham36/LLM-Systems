@@ -34,5 +34,5 @@ else
 fi
 
 # Run the Python script
-# echo "Running Python script..."
-# python3 python/tiled_matmul_wrapper.py
+echo "Running Python script..."
+python3 python/tiled_matmul_wrapper.py
