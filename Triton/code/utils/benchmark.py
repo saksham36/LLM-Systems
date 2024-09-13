@@ -1,4 +1,14 @@
-def run_benchmark(triton_func, torch_func, torch_jit_func, plot_name="softmax-performance"):
+import os
+import torch
+import triton
+from pathlib import Path
+
+def run_benchmark(triton_func, torch_func, torch_jit_func, plot_name="softmax-performance", save_path='code/benchmark'):
+    save_path = os.path.join(save_path,plot_name)
+    try:
+        os.makedirs(save_path)
+    except Exception as e:
+        print(f"New folder not created. {e}")
     @triton.testing.perf_report(
         triton.testing.Benchmark(
             x_names=['N'],  # argument names to use as an x-axis for the plot
@@ -12,12 +22,13 @@ def run_benchmark(triton_func, torch_func, torch_jit_func, plot_name="softmax-pe
             args={'M': 4096},  # values for function arguments not in `x_names` and `y_name`
         )
     )
+
     def benchmark(M, N, provider):
         x = torch.randn(M, N, device='cuda', dtype=torch.float32)
         quantiles = [0.5, 0.2, 0.8]
         
         if provider == 'torch-native':
-            ms, min_ms, max_ms = triton.testing.do_bench(lambda: torch_func(x), quantiles=quantiles)
+            ms, min_ms, max_ms = triton.testing.do_bench(lambda: torch_func(x , axis=-1), quantiles=quantiles)
         if provider == 'triton':
             ms, min_ms, max_ms = triton.testing.do_bench(lambda: triton_func(x), quantiles=quantiles)
         if provider == 'torch-jit':
@@ -25,4 +36,5 @@ def run_benchmark(triton_func, torch_func, torch_jit_func, plot_name="softmax-pe
         
         gbps = lambda ms: 2 * x.nelement() * x.element_size() * 1e-9 / (ms * 1e-3)
         return gbps(ms), gbps(max_ms), gbps(min_ms)
+    benchmark.run(show_plots=True, print_data=True, save_path=save_path)
 
