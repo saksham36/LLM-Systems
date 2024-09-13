@@ -3,6 +3,7 @@ import torch.nn.functional as F
 import triton
 import triton.language as tl
 
+from benchmark import run_benchmark
 
 def naive_softmax(x: torch.tensor):
     x_max = x.max(dim=-1)[0]
@@ -47,32 +48,61 @@ def _softmax_fwd_kernel(
 
 
 
-
-
-def softmax(x: torch.tensor) -> torch.tensor:
-    """Triton implementation of softmax. fwd pass"""
+def softmax(x:torch.Tensor)->torch.Tensor:
+    """ Triton impl of Softmax, fwd pass only """
     rows, cols = x.shape
-    # Parallize on the row.
+    assert x.dim() ==2, f"only accepts 2D tensors for now"
     block_size = triton.next_power_of_2(cols)
+    num_warps = 4  # *32 
+    if block_size > 2047: # 2048
+        num_warps = 8
+    if block_size > 4095: # 4096
+        num_warps=16
+    
+    grid = (rows,)
 
-    num_warps = 4 # num_warps * 32 = # threads
-    while block_size > num_warps * 32:  # Each warp has 32 threads
-        num_warps *= 2
-    grid = (rows, )
-
-    # allocate output buffer
-    out = torch.empty_like(x)
+    # allocate our output buffer
+    sm_out = torch.empty_like(x)
 
     _softmax_fwd_kernel[grid](
-        out, 
-        out.stride(0),
+        sm_out,
+        sm_out.stride(0),
         x,
         x.stride(0),
         cols,
         block_size=block_size,
-        num_warps=num_warps # Only observed by compiler. Not needed in kernel
-        )
-    return out
+        num_warps =num_warps
+
+    )
+
+    return sm_out
+
+
+# def softmax(x: torch.tensor) -> torch.tensor:
+#     """Triton implementation of softmax. fwd pass"""
+#     rows, cols = x.shape
+#     assert x.dim() ==2, f"only accepts 2D tensors for now"
+#     # Parallize on the row.
+#     block_size = triton.next_power_of_2(cols)
+
+#     num_warps = 4 # num_warps * 32 = # threads
+#     while block_size > num_warps * 32:  # Each warp has 32 threads
+#         num_warps *= 2
+#     grid = (rows, )
+
+#     # allocate output buffer
+#     out = torch.empty_like(x)
+
+#     _softmax_fwd_kernel[grid](
+#         out, 
+#         out.stride(0),
+#         x,
+#         x.stride(0),
+#         cols,
+#         block_size=block_size,
+#         num_warps=num_warps # Only observed by compiler. Not needed in kernel
+#         )
+#     return out
 
 
 sample = torch.tensor([[1, 2, 3, 4, 5], [5, 4, 3, 2, 1]], dtype=torch.float32, device='cuda')
@@ -86,3 +116,13 @@ assert torch.allclose(ref_out, naive_out, rtol=1e-05, atol=1e-08), "Tensors are 
 triton_out = softmax(sample)
 print(f'{triton_out=}')
 assert torch.allclose(ref_out, triton_out, rtol=1e-05, atol=1e-08), "Tensors are not nearly equal"
+
+from pathlib import Path
+
+# Example usage:
+triton_func = softmax  # Define your Triton softmax function
+torch_func = torch.softmax  # Native PyTorch softmax function
+torch_jit_func = naive_softmax  # JIT optimized softmax function
+
+# Run the benchmark with the functions and custom plot name
+run_benchmark(triton_func, torch_func, torch_jit_func, plot_name="softmax-performance")
